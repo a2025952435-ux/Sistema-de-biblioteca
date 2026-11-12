@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.16)
+project(BibliotecaDesktop LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
+add_executable(Biblioteca WIN32 src/main.cpp src/Janela.cpp src/Biblioteca.cpp src/Sistema.cpp src/Aluno.cpp src/Professor.cpp src/Usuario.cpp src/Livro.cpp src/ItemAcervo.cpp src/Historico.cpp src/EmailService.cpp)
+target_include_directories(Biblioteca PRIVATE include)
+target_link_libraries(Biblioteca PRIVATE Qt6::Widgets)

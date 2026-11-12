@@ -1,0 +1,283 @@
+#include "../include/Biblioteca.h"
+#include "../include/Livro.h"
+#include "../include/Revista.h"
+#include "../include/Aluno.h"
+#include "../include/Professor.h"
+#include <iostream>
+
+Biblioteca::Biblioteca() {
+    acervo.push_back(new Livro(101, "Dom Casmurro", "Machado de Assis"));
+    acervo.push_back(new Livro(102, "Diario de um Banana", "Jeff Kinney"));
+    acervo.push_back(new Revista(103, "National Geographic", 205));
+}
+
+Biblioteca::~Biblioteca() {
+    for (auto item : acervo) {
+        delete item;
+    }
+    acervo.clear();
+}
+
+ItemAcervo* Biblioteca::buscarItemPorCodigo(int codigo) {
+    for (auto item : acervo) {
+        if (item->getCodigo() == codigo) return item;
+    }
+    return nullptr;
+}
+
+void Biblioteca::cadastrarLivro() {
+    int cod;
+    std::string tit, aut;
+
+    std::cout << "\n--- CADASTRAR NOVO LIVRO ---\n";
+    std::cout << "Digite o codigo (apenas numeros): ";
+    std::cin >> cod;
+    std::cin.ignore();
+
+    if (buscarItemPorCodigo(cod) != nullptr) {
+        std::cout << "\n❌ [ERRO]: O codigo " << cod << " ja existe no acervo!\n";
+        return;
+    }
+
+    std::cout << "Digite o titulo: ";
+    std::getline(std::cin, tit);
+
+    std::cout << "Digite o autor: ";
+    std::getline(std::cin, aut);
+
+    acervo.push_back(new Livro(cod, tit, aut));
+    std::cout << "✅ Livro '" << tit << "' cadastrado com sucesso!\n";
+}
+
+void Biblioteca::cadastrarRevista() {
+    int cod, ed;
+    std::string tit;
+
+    std::cout << "\n--- CADASTRAR NOVA REVISTA ---\n";
+    std::cout << "Digite o codigo (apenas numeros): ";
+    std::cin >> cod;
+    std::cin.ignore();
+
+    if (buscarItemPorCodigo(cod) != nullptr) {
+        std::cout << "\n❌ [ERRO]: O codigo " << cod << " ja existe no acervo!\n";
+        return;
+    }
+
+    std::cout << "Digite o titulo: ";
+    std::getline(std::cin, tit);
+
+    std::cout << "Digite a edicao (numero): ";
+    std::cin >> ed;
+    std::cin.ignore();
+
+    acervo.push_back(new Revista(cod, tit, ed));
+    std::cout << "✅ Revista '" << tit << "' cadastrada com sucesso!\n";
+}
+
+void Biblioteca::localizarItem() {
+    int cod;
+    std::cout << "\n--- LOCALIZAR ITEM ---\n";
+    std::cout << "Digite o codigo: ";
+    std::cin >> cod;
+
+    ItemAcervo* item = buscarItemPorCodigo(cod);
+    if (item != nullptr) {
+        std::cout << "\n[ITEM ENCONTRADO]:\n";
+        std::cout << "--------------------------------------------------\n";
+        item->exibirDetalhes();
+        std::cout << "--------------------------------------------------\n";
+    } else {
+        std::cout << "O item com codigo " << cod << " nao foi encontrado.\n";
+    }
+}
+
+void Biblioteca::emprestarItem() {
+    int cod, tipoUser;
+    std::string nomeLeitor, emailLeitor;
+
+    std::cout << "\n--- EMPRESTAR ITEM ---\n";
+    std::cout << "Digite o codigo do item: ";
+    std::cin >> cod;
+
+    ItemAcervo* item = buscarItemPorCodigo(cod);
+    if (item == nullptr) {
+        std::cout << "Item nao encontrado.\n";
+        return;
+    }
+
+    std::cout << "Digite o tipo de usuario (1-Aluno | 2-Professor): ";
+    std::cin >> tipoUser;
+    std::cin.ignore();
+
+    std::cout << "Digite o nome do leitor: ";
+    std::getline(std::cin, nomeLeitor);
+
+    std::cout << "Digite o e-mail do leitor para notificacoes: ";
+    std::getline(std::cin, emailLeitor);
+
+    Usuario* usuario = nullptr;
+    if (tipoUser == 2) {
+        usuario = new Professor(nomeLeitor);
+    } else {
+        usuario = new Aluno(nomeLeitor);
+    }
+
+    if (!item->isEmprestado()) {
+        item->emprestar(usuario, emailLeitor);
+        historico.push_back(Historico(item->getCodigo(), item->getTitulo(), "EMPRESTADO"));
+        
+        std::cout << "\n✅ Sucesso! '" << item->getTitulo() << "' emprestado para " << usuario->getNome() 
+                  << ". Devolucao ate: " << item->getDataDevolucaoFormatada() << "\n";
+
+        std::string msg = "Ola " + usuario->getNome() + ",\n\n" +
+                          "Voce realizou o emprestimo de: '" + item->getTitulo() + "'.\n" +
+                          "Data limite para devolucao: " + item->getDataDevolucaoFormatada() + ".\n\n" +
+                          "Boa leitura!\nSistema de Biblioteca";
+        emailService.enviarEmail(emailLeitor, "Confirmacao de Emprestimo - Biblioteca", msg);
+
+        delete usuario; 
+    } else {
+        std::cout << "O item '" << item->getTitulo() << "' ja esta emprestado para " << item->getNomeLeitorAtual() << "!\n";
+        item->adicionarNaFila(usuario); 
+    }
+}
+
+void Biblioteca::devolverItem() {
+    int cod;
+    std::cout << "\n--- DEVOLVER ITEM ---\n";
+    std::cout << "Digite o codigo do item: ";
+    std::cin >> cod;
+
+    ItemAcervo* item = buscarItemPorCodigo(cod);
+    if (item == nullptr) {
+        std::cout << "Item nao encontrado.\n";
+        return;
+    }
+
+    std::string email = item->getEmailLeitorAtual();
+    std::string nome = item->getNomeLeitorAtual();
+    std::string titulo = item->getTitulo();
+
+    if (item->devolver()) {
+        historico.push_back(Historico(item->getCodigo(), item->getTitulo(), "DEVOLVIDO"));
+        std::cout << "\n✅ Devolucao registrada com sucesso para '" << titulo << "'.\n";
+
+        if (!email.empty()) {
+            std::string msg = "Ola " + nome + ",\n\n" +
+                              "Confirmamos a devolucao do item '" + titulo + "'.\n" +
+                              "Obrigado por utilizar a nossa biblioteca!\n";
+            emailService.enviarEmail(email, "Confirmacao de Devolucao - Biblioteca", msg);
+        }
+    } else {
+        std::cout << "Este item ja esta na estante.\n";
+    }
+}
+
+void Biblioteca::excluirItem() {
+    int cod;
+    std::cout << "\n--- EXCLUIR ITEM DO ACERVO ---\n";
+    std::cout << "Digite o codigo do item a ser removido: ";
+    std::cin >> cod;
+
+    for (auto it = acervo.begin(); it != acervo.end(); ++it) {
+        if ((*it)->getCodigo() == cod) {
+            if ((*it)->isEmprestado()) {
+                std::cout << "❌ [BLOQUEADO]: Nao e possivel excluir. Item emprestado para " << (*it)->getNomeLeitorAtual() << "!\n";
+                return;
+            }
+
+            historico.push_back(Historico((*it)->getCodigo(), (*it)->getTitulo(), "REMOVIDO"));
+            std::cout << "Sucesso! '" << (*it)->getTitulo() << "' foi removido do acervo.\n";
+            delete *it;
+            acervo.erase(it);
+            return;
+        }
+    }
+    std::cout << "Item com codigo " << cod << " nao foi encontrado.\n";
+}
+
+void Biblioteca::verificarENotificarPrazos() {
+    std::cout << "\n==================================================\n";
+    std::cout << "     VERIFICANDO PRAZOS E ENVIANDO ALERTAS        \n";
+    std::cout << "==================================================\n";
+
+    bool encontrouPendencia = false;
+
+    for (auto item : acervo) {
+        if (item->isEmprestado()) {
+            int diasRestantes = item->calcularDiasRestantes();
+            std::string email = item->getEmailLeitorAtual();
+
+            if (diasRestantes <= 2 && diasRestantes >= 0) {
+                encontrouPendencia = true;
+                std::cout << "[ALERTA DE PROXIMO AO VENCIMENTO]: '" << item->getTitulo() 
+                          << "' (Leitor: " << item->getNomeLeitorAtual() << ") vence em " << diasRestantes << " dia(s).\n";
+
+                std::string msg = "Ola " + item->getNomeLeitorAtual() + ",\n\n" +
+                                  "Lembrete: O prazo de devolucao do item '" + item->getTitulo() + 
+                                  "' vence no dia " + item->getDataDevolucaoFormatada() + " (faltam " + std::to_string(diasRestantes) + " dias).\n\n" +
+                                  "Por favor, providencie a devolucao ou solicite a renovacao junto a biblioteca.\n";
+                
+                emailService.enviarEmail(email, "AVISO: Prazo de devolucao proximo do fim", msg);
+            } 
+            else if (diasRestantes < 0) {
+                encontrouPendencia = true;
+                std::cout << "[ALERTA DE ATRASO]: '" << item->getTitulo() 
+                          << "' (Leitor: " << item->getNomeLeitorAtual() << ") esta ATRASADO ha " << (-diasRestantes) << " dia(s)!\n";
+
+                std::string msg = "URGENTE: Ola " + item->getNomeLeitorAtual() + ",\n\n" +
+                                  "O prazo para devolucao do item '" + item->getTitulo() + 
+                                  "' expirou em " + item->getDataDevolucaoFormatada() + ".\n\n" +
+                                  "Por favor, devolva o item o quanto antes para evitar multas.\n";
+                
+                emailService.enviarEmail(email, "URGENTE: Item com devolucao atrasada", msg);
+            }
+        }
+    }
+
+    if (!encontrouPendencia) {
+        std::cout << "Nenhum item precisa de alerta no momento.\n";
+    }
+    std::cout << "==================================================\n";
+}
+
+void Biblioteca::exibirHistorico() const {
+    std::cout << "\n==================================================\n";
+    std::cout << "          HISTORICO DO SISTEMA (LOG)             \n";
+    std::cout << "==================================================\n";
+
+    if (historico.empty()) {
+        std::cout << "Nenhuma movimentacao registrada.\n";
+    } else {
+        int cont = 1;
+        for (const auto& log : historico) {
+            std::cout << cont++ << ". ";
+            log.exibir();
+        }
+    }
+    std::cout << "==================================================\n";
+}
+
+void Biblioteca::mostrarRelatorioAcervo() const {
+    std::cout << "\n==================================================\n";
+    std::cout << "         RELATORIO DETALHADO DO ACERVO           \n";
+    std::cout << "==================================================\n";
+
+    if (acervo.empty()) {
+        std::cout << "[AVISO]: Acervo totalmente vazio.\n";
+        return;
+    }
+
+    int cont = 1;
+    for (const auto item : acervo) {
+        std::cout << "\n[ITEM #" << cont++ << "]\n";
+        std::cout << "--------------------------------------------------\n";
+        item->exibirDetalhes();
+        if (item->isEmprestado()) {
+            std::cout << "E-mail Leitor: " << item->getEmailLeitorAtual() << "\n";
+            std::cout << "Data Limit  : " << item->getDataDevolucaoFormatada() << "\n";
+        }
+        std::cout << "--------------------------------------------------\n";
+    }
+    std::cout << "==================================================\n";
+}

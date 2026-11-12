@@ -1,0 +1,9 @@
+build/
+executavel/
+*.exe
+*.dll
+*.o
+*.obj
+.vscode/
+biblioteca_terminal.txt
+Biblioteca_Portatil.zip
